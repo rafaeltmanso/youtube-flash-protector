@@ -6,11 +6,11 @@
 
   // Default settings
   let settings = {
-    sensitivity: 200,      // Brightness threshold (0-255)
-    sampleRate: 3,        // Frames per second to sample
-    flashHoldFrames: 5,    // Consecutive frames with flash to trigger warning (reduces flicker)
-    normalHoldFrames: 10,  // Consecutive frames normal to hide warning
-    showNotification: true // Play notification sound
+    sensitivity: 200,
+    sampleRate: 8,
+    flashHoldFrames: 2,
+    normalHoldFrames: 8,
+    showNotification: true
   };
 
   // Stats
@@ -263,7 +263,7 @@
       // Remove after transition completes
       setTimeout(() => {
         removeWarningOverlay();
-      }, 300); // Match the transition duration
+      }, 1000); // Match the transition duration
     }
     isFlashDetected = false;
     wasAlreadyDetected = false;
@@ -320,7 +320,7 @@
         justify-content: center;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         opacity: 0;
-        transition: opacity 0.3s ease-in-out;
+        transition: opacity 0.15s ease-in-out;
         pointer-events: none;
       }
 
