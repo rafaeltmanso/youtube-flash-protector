@@ -1,10 +1,9 @@
 // YouTube Flash Protector - Content Script
-// Analyzes video frames for brightness and shows warning overlay when flash is detected
+// Monitors video brightness and shows warning overlay when flashes are detected
 
 (function() {
   'use strict';
 
-  // Default settings
   let settings = {
     sensitivity: 200,
     sampleRate: 10,
@@ -12,49 +11,44 @@
     showNotification: true
   };
 
-  // Stats
   let stats = {
     flashesDetected: 0,
     videosProtected: 0
   };
 
-  // State
   let video = null;
   let canvas = null;
   let ctx = null;
   let warningOverlay = null;
-  let sampleInterval = null;
   let isEnabled = true;
   let isFlashDetected = false;
   let normalFrameCount = 0;
-  let wasAlreadyDetected = false; // Track if we already counted this flash episode
+  let wasAlreadyDetected = false;
+  let lastSampleTime = 0;
+  let animationFrameId = null;
 
-  // Initialize the extension
   function init() {
-    // Load settings from storage
+    console.log('[Flash Protector] Initializing...');
+    
     chrome.storage.sync.get(settings, (result) => {
       settings = { ...settings, ...result };
       loadStats();
     });
 
-    // Create hidden canvas for frame analysis
     canvas = document.createElement('canvas');
     canvas.style.display = 'none';
-    canvas.width = 160;  // Low resolution for performance
-    canvas.height = 90;
+    canvas.width = 80;
+    canvas.height = 45;
     ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    // Find and monitor video
-    monitorVideo();
-
-    // Listen for messages from popup
+    findVideo();
+    
     chrome.runtime.onMessage.addListener(handleMessage);
-
-    // Create warning overlay styles
     createWarningStyles();
+    
+    console.log('[Flash Protector] Ready');
   }
 
-  // Load stats from storage
   function loadStats() {
     chrome.storage.sync.get(['flashesDetected', 'videosProtected'], (result) => {
       stats.flashesDetected = result.flashesDetected || 0;
@@ -62,7 +56,6 @@
     });
   }
 
-  // Save stats to storage
   function saveStats() {
     chrome.storage.sync.set({
       flashesDetected: stats.flashesDetected,
@@ -70,70 +63,74 @@
     });
   }
 
-  // Monitor for video element changes
-  function monitorVideo() {
-    // MutationObserver to detect dynamically loaded videos
-    const observer = new MutationObserver(() => {
-      const newVideo = document.querySelector('video.html5-main-video');
-      if (newVideo && newVideo !== video) {
-        video = newVideo;
+  function findVideo() {
+    const selectors = [
+      'video.html5-main-video',
+      'video.ytp-ad-module video',
+      'video.style-scope',
+      '#movie_player video',
+      'video'
+    ];
+    
+    for (const sel of selectors) {
+      const v = document.querySelector(sel);
+      if (v && v.readyState >= 2) {
+        video = v;
+        console.log('[Flash Protector] Video found:', sel);
         startMonitoring();
+        return;
       }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Check if video already exists
-    video = document.querySelector('video.html5-main-video');
-    if (video) {
-      startMonitoring();
     }
+
+    // Try again after a short delay
+    setTimeout(findVideo, 1000);
   }
 
-  // Start monitoring the video
   function startMonitoring() {
-    // Clear any existing monitoring
-    if (sampleInterval) {
-      clearInterval(sampleInterval);
-    }
-
-    // Reset state for new video
+    if (!video) return;
+    
+    console.log('[Flash Protector] Starting monitoring');
+    
     isFlashDetected = false;
     normalFrameCount = 0;
     wasAlreadyDetected = false;
     removeWarningOverlay();
-
-    // Start sampling frames
-    const intervalMs = 1000 / settings.sampleRate;
-    sampleInterval = setInterval(sampleFrame, intervalMs);
+    
+    lastSampleTime = performance.now();
+    sampleLoop();
   }
 
-  // Sample a video frame and analyze brightness
-  function sampleFrame() {
-    if (!video || !isEnabled || video.paused || video.ended) {
+  function sampleLoop() {
+    if (!video || !isEnabled) {
+      animationFrameId = requestAnimationFrame(sampleLoop);
       return;
     }
 
+    const now = performance.now();
+    const sampleInterval = 1000 / settings.sampleRate;
+
+    if (now - lastSampleTime >= sampleInterval) {
+      lastSampleTime = now;
+      
+      if (!video.paused && !video.ended && video.readyState >= 2) {
+        analyzeFrame();
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(sampleLoop);
+  }
+
+  function analyzeFrame() {
+    if (!video || !ctx) return;
+
     try {
-      // Draw current frame to canvas (mirrored for YouTube's mirrored videos)
       ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.restore();
 
-      // Get pixel data from center region only (to ignore subtitles/UI)
-      const centerX = Math.floor(canvas.width * 0.2);
-      const centerY = Math.floor(canvas.height * 0.2);
-      const centerW = Math.floor(canvas.width * 0.6);
-      const centerH = Math.floor(canvas.height * 0.6);
-
-      const imageData = ctx.getImageData(centerX, centerY, centerW, centerH);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Calculate average brightness and white pixel percentage
       let totalBrightness = 0;
       let whitePixels = 0;
       const pixelCount = data.length / 4;
@@ -143,10 +140,8 @@
         const g = data[i + 1];
         const b = data[i + 2];
 
-        // Calculate perceived brightness
-        const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+        const brightness = r * 0.299 + g * 0.587 + b * 0.114;
 
-        // Check if pixel is "white" (high values in all channels)
         if (r > settings.sensitivity && g > settings.sensitivity && b > settings.sensitivity) {
           whitePixels++;
         }
@@ -157,39 +152,33 @@
       const avgBrightness = totalBrightness / pixelCount;
       const whitePercentage = (whitePixels / pixelCount) * 100;
 
-      // Detect flash: high average brightness OR significant white area
       const brightnessThreshold = settings.sensitivity * 0.8;
-      const whiteThreshold = 50; // 50% white pixels triggers protection
+      const whiteThreshold = 50;
 
       const currentFrameHasFlash = avgBrightness > brightnessThreshold || whitePercentage > whiteThreshold;
 
       if (currentFrameHasFlash) {
         if (!isFlashDetected) {
-          triggerWarning(avgBrightness, whitePercentage);
+          triggerWarning();
         }
-      } else {
-        if (isFlashDetected) {
-          normalFrameCount++;
-          if (normalFrameCount >= settings.normalHoldFrames) {
-            hideWarning();
-          }
+      } else if (isFlashDetected) {
+        normalFrameCount++;
+        if (normalFrameCount >= settings.normalHoldFrames) {
+          hideWarning();
         }
       }
     } catch (e) {
-      // CORS or other errors - ignore
+      // CORS or other errors
     }
   }
 
-  // Trigger flash warning (video keeps playing)
-  function triggerWarning(avgBrightness, whitePercentage) {
+  function triggerWarning() {
     isFlashDetected = true;
 
-    // Count as a new flash episode (only once per episode)
     if (!wasAlreadyDetected) {
       wasAlreadyDetected = true;
       stats.flashesDetected++;
 
-      // Increment videos protected only if this is a new video
       const currentVideoId = new URLSearchParams(window.location.search).get('v');
       if (currentVideoId) {
         stats.videosProtected++;
@@ -198,27 +187,16 @@
       saveStats();
       notifyStatsUpdate();
 
-      // Play notification sound if enabled
       if (settings.showNotification) {
         playNotificationSound();
       }
     }
 
-    // Show warning overlay (video continues in background)
     showWarningOverlay();
   }
 
-  // Show warning overlay
   function showWarningOverlay() {
-    // Don't recreate if already exists
-    if (warningOverlay && warningOverlay.parentNode) {
-      // Update status text to show "Detecting..."
-      const statusEl = warningOverlay.querySelector('.warning-status');
-      if (statusEl) {
-        statusEl.textContent = 'Bright flash detected - protecting your eyes';
-      }
-      return;
-    }
+    if (warningOverlay && warningOverlay.parentNode) return;
 
     warningOverlay = document.createElement('div');
     warningOverlay.id = 'flash-protector-warning';
@@ -238,7 +216,6 @@
 
     document.body.appendChild(warningOverlay);
 
-    // Trigger fade-in animation after a tiny delay
     requestAnimationFrame(() => {
       if (warningOverlay) {
         warningOverlay.classList.add('visible');
@@ -246,21 +223,18 @@
     });
   }
 
-  // Hide warning overlay
   function hideWarning() {
     if (warningOverlay) {
       warningOverlay.classList.remove('visible');
-      // Remove after transition completes
       setTimeout(() => {
         removeWarningOverlay();
-      }, 1000); // Match the transition duration
+      }, 500);
     }
     isFlashDetected = false;
     wasAlreadyDetected = false;
     normalFrameCount = 0;
   }
 
-  // Remove warning overlay
   function removeWarningOverlay() {
     if (warningOverlay) {
       if (warningOverlay.parentNode) {
@@ -270,7 +244,6 @@
     }
   }
 
-  // Play notification sound
   function playNotificationSound() {
     try {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -288,12 +261,9 @@
 
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
-    } catch (e) {
-      // Audio not supported
-    }
+    } catch (e) {}
   }
 
-  // Create warning overlay styles
   function createWarningStyles() {
     const style = document.createElement('style');
     style.textContent = `
@@ -371,11 +341,9 @@
     document.head.appendChild(style);
   }
 
-  // Handle messages from popup
   function handleMessage(message, sender, sendResponse) {
     if (message.action === 'updateSettings') {
       settings = { ...settings, ...message.settings };
-      // Restart monitoring with new settings
       startMonitoring();
       sendResponse({ success: true });
     } else if (message.action === 'getStats') {
@@ -389,8 +357,8 @@
       isEnabled = message.enabled;
       if (isEnabled) {
         startMonitoring();
-      } else if (sampleInterval) {
-        clearInterval(sampleInterval);
+      } else if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
         removeWarningOverlay();
       }
       sendResponse({ success: true });
@@ -398,7 +366,6 @@
     return true;
   }
 
-  // Notify popup of stats update
   function notifyStatsUpdate() {
     chrome.runtime.sendMessage({
       action: 'statsUpdate',
@@ -407,7 +374,17 @@
     });
   }
 
-  // Initialize when DOM is ready
+  // Watch for video element changes
+  const videoObserver = new MutationObserver(() => {
+    if (!video || !document.contains(video)) {
+      findVideo();
+    }
+  });
+
+  if (document.body) {
+    videoObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
