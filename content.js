@@ -200,6 +200,7 @@
 
     warningOverlay = document.createElement('div');
     warningOverlay.id = 'flash-protector-warning';
+    warningOverlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
     warningOverlay.innerHTML = `
       <div class="flash-warning-container">
         <div class="flash-icon">
@@ -215,21 +216,10 @@
     `;
 
     document.body.appendChild(warningOverlay);
-
-    requestAnimationFrame(() => {
-      if (warningOverlay) {
-        warningOverlay.classList.add('visible');
-      }
-    });
   }
 
   function hideWarning() {
-    if (warningOverlay) {
-      warningOverlay.classList.remove('visible');
-      setTimeout(() => {
-        removeWarningOverlay();
-      }, 500);
-    }
+    removeWarningOverlay();
     isFlashDetected = false;
     wasAlreadyDetected = false;
     normalFrameCount = 0;
@@ -279,15 +269,8 @@
         align-items: center;
         justify-content: center;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        opacity: 0;
-        transition: opacity 0.15s ease-in-out;
-        pointer-events: none;
-      }
-
-      #flash-protector-warning.visible {
         opacity: 1;
         pointer-events: auto;
-      }
 
       .flash-warning-container {
         text-align: center;
