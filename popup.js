@@ -1,6 +1,6 @@
 // Popup Script - Communicates with content script and manages settings
 document.addEventListener('DOMContentLoaded', () => {
-const sensitivitySlider = document.getElementById('sensitivity');
+  const sensitivitySlider = document.getElementById('sensitivity');
   const sensitivityValue = document.getElementById('sensitivityValue');
   const sampleRateSlider = document.getElementById('sampleRate');
   const sampleRateValue = document.getElementById('sampleRateValue');
@@ -46,13 +46,6 @@ const sensitivitySlider = document.getElementById('sensitivity');
     sendSettingsToContent();
   });
 
-  flashHoldFramesSlider.addEventListener('input', (e) => {
-    const value = e.target.value;
-    flashHoldFramesValue.textContent = value;
-    chrome.storage.sync.set({ flashHoldFrames: parseInt(value) });
-    sendSettingsToContent();
-  });
-
   normalHoldFramesSlider.addEventListener('input', (e) => {
     const value = e.target.value;
     normalHoldFramesValue.textContent = value;
@@ -69,7 +62,6 @@ const sensitivitySlider = document.getElementById('sensitivity');
     chrome.storage.sync.set({ flashesDetected: 0, videosProtected: 0 });
     flashesDetectedEl.textContent = '0';
     videosProtectedEl.textContent = '0';
-    // Reset content script stats too
     chrome.runtime.sendMessage({ action: 'resetStats' });
   });
 
@@ -82,7 +74,6 @@ const sensitivitySlider = document.getElementById('sensitivity');
           settings: {
             sensitivity: parseInt(sensitivitySlider.value),
             sampleRate: parseInt(sampleRateSlider.value),
-            flashHoldFrames: parseInt(flashHoldFramesSlider.value),
             normalHoldFrames: parseInt(normalHoldFramesSlider.value),
             showNotification: showNotificationToggle.checked
           }
@@ -94,7 +85,6 @@ const sensitivitySlider = document.getElementById('sensitivity');
   // Check if on YouTube and get stats
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].url && tabs[0].url.includes('youtube.com')) {
-      // Request stats from content script
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getStats' }, (response) => {
         if (response) {
           flashesDetectedEl.textContent = response.flashesDetected || 0;

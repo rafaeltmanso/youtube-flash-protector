@@ -8,7 +8,7 @@
   let settings = {
     sensitivity: 200,
     sampleRate: 10,
-    normalHoldFrames: 8,
+    normalHoldFrames: 5,
     showNotification: true
   };
 
@@ -102,7 +102,6 @@
 
     // Reset state for new video
     isFlashDetected = false;
-    flashFrameCount = 0;
     normalFrameCount = 0;
     wasAlreadyDetected = false;
     removeWarningOverlay();
