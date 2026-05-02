@@ -1,11 +1,9 @@
 // Popup Script - Communicates with content script and manages settings
 document.addEventListener('DOMContentLoaded', () => {
-  const sensitivitySlider = document.getElementById('sensitivity');
+const sensitivitySlider = document.getElementById('sensitivity');
   const sensitivityValue = document.getElementById('sensitivityValue');
   const sampleRateSlider = document.getElementById('sampleRate');
   const sampleRateValue = document.getElementById('sampleRateValue');
-  const flashHoldFramesSlider = document.getElementById('flashHoldFrames');
-  const flashHoldFramesValue = document.getElementById('flashHoldFramesValue');
   const normalHoldFramesSlider = document.getElementById('normalHoldFrames');
   const normalHoldFramesValue = document.getElementById('normalHoldFramesValue');
   const showNotificationToggle = document.getElementById('showNotification');
@@ -15,8 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusDot = document.querySelector('.status-dot');
   const statusText = document.querySelector('.status-text');
 
-  // Load saved settings
-  chrome.storage.sync.get(['sensitivity', 'sampleRate', 'flashHoldFrames', 'normalHoldFrames', 'showNotification'], (result) => {
+  chrome.storage.sync.get(['sensitivity', 'sampleRate', 'normalHoldFrames', 'showNotification'], (result) => {
     if (result.sensitivity !== undefined) {
       sensitivitySlider.value = result.sensitivity;
       sensitivityValue.textContent = result.sensitivity;
@@ -24,10 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result.sampleRate !== undefined) {
       sampleRateSlider.value = result.sampleRate;
       sampleRateValue.textContent = result.sampleRate;
-    }
-    if (result.flashHoldFrames !== undefined) {
-      flashHoldFramesSlider.value = result.flashHoldFrames;
-      flashHoldFramesValue.textContent = result.flashHoldFrames;
     }
     if (result.normalHoldFrames !== undefined) {
       normalHoldFramesSlider.value = result.normalHoldFrames;

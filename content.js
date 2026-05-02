@@ -7,8 +7,7 @@
   // Default settings
   let settings = {
     sensitivity: 200,
-    sampleRate: 8,
-    flashHoldFrames: 2,
+    sampleRate: 10,
     normalHoldFrames: 8,
     showNotification: true
   };
@@ -27,7 +26,6 @@
   let sampleInterval = null;
   let isEnabled = true;
   let isFlashDetected = false;
-  let flashFrameCount = 0;
   let normalFrameCount = 0;
   let wasAlreadyDetected = false; // Track if we already counted this flash episode
 
@@ -167,22 +165,15 @@
       const currentFrameHasFlash = avgBrightness > brightnessThreshold || whitePercentage > whiteThreshold;
 
       if (currentFrameHasFlash) {
-        // Flash detected in this frame
-        flashFrameCount++;
-        normalFrameCount = 0;
-
-        // Only trigger warning after consecutive flash frames (reduces flicker/stutter)
-        if (flashFrameCount >= settings.flashHoldFrames && !isFlashDetected) {
+        if (!isFlashDetected) {
           triggerWarning(avgBrightness, whitePercentage);
         }
       } else {
-        // Normal frame
-        normalFrameCount++;
-        flashFrameCount = 0;
-
-        // Only hide warning after consecutive normal frames
-        if (normalFrameCount >= settings.normalHoldFrames && isFlashDetected) {
-          hideWarning();
+        if (isFlashDetected) {
+          normalFrameCount++;
+          if (normalFrameCount >= settings.normalHoldFrames) {
+            hideWarning();
+          }
         }
       }
     } catch (e) {
