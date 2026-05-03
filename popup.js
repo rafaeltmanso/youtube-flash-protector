@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const videosProtectedEl = document.getElementById('videosProtected');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
+  const statusContainer = document.getElementById('status');
 
   chrome.storage.sync.get(['sensitivity', 'normalHoldFrames', 'showNotification', 'protectionEnabled'], (result) => {
     if (result.sensitivity !== undefined) {
@@ -65,9 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateStatus(enabled) {
     if (enabled) {
+      statusContainer.classList.remove('disabled');
       statusDot.classList.add('active');
       statusText.textContent = 'Protection Active';
     } else {
+      statusContainer.classList.add('disabled');
       statusDot.classList.remove('active');
       statusText.textContent = 'Protection Disabled';
     }

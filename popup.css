@@ -49,6 +49,19 @@ header {
   margin-bottom: 20px;
 }
 
+.status.disabled {
+  background: rgba(102, 102, 102, 0.15);
+  border: 1px solid rgba(102, 102, 102, 0.3);
+}
+
+.status.disabled .status-text {
+  color: #888;
+}
+
+.status.disabled .status-dot {
+  background: #666;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
