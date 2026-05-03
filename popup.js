@@ -2,25 +2,20 @@
 document.addEventListener('DOMContentLoaded', () => {
   const sensitivitySlider = document.getElementById('sensitivity');
   const sensitivityValue = document.getElementById('sensitivityValue');
-  const sampleRateSlider = document.getElementById('sampleRate');
-  const sampleRateValue = document.getElementById('sampleRateValue');
   const normalHoldFramesSlider = document.getElementById('normalHoldFrames');
   const normalHoldFramesValue = document.getElementById('normalHoldFramesValue');
   const showNotificationToggle = document.getElementById('showNotification');
+  const protectionEnabledToggle = document.getElementById('protectionEnabled');
   const resetBtn = document.getElementById('resetStats');
   const flashesDetectedEl = document.getElementById('flashesDetected');
   const videosProtectedEl = document.getElementById('videosProtected');
-  const statusDot = document.querySelector('.status-dot');
-  const statusText = document.querySelector('.status-text');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
 
-  chrome.storage.sync.get(['sensitivity', 'sampleRate', 'normalHoldFrames', 'showNotification'], (result) => {
+  chrome.storage.sync.get(['sensitivity', 'normalHoldFrames', 'showNotification', 'protectionEnabled'], (result) => {
     if (result.sensitivity !== undefined) {
       sensitivitySlider.value = result.sensitivity;
       sensitivityValue.textContent = result.sensitivity;
-    }
-    if (result.sampleRate !== undefined) {
-      sampleRateSlider.value = result.sampleRate;
-      sampleRateValue.textContent = result.sampleRate;
     }
     if (result.normalHoldFrames !== undefined) {
       normalHoldFramesSlider.value = result.normalHoldFrames;
@@ -29,20 +24,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result.showNotification !== undefined) {
       showNotificationToggle.checked = result.showNotification;
     }
+    if (result.protectionEnabled !== undefined) {
+      protectionEnabledToggle.checked = result.protectionEnabled;
+    }
+    updateStatus(result.protectionEnabled !== false);
   });
 
-  // Slider event listeners
   sensitivitySlider.addEventListener('input', (e) => {
     const value = e.target.value;
     sensitivityValue.textContent = value;
     chrome.storage.sync.set({ sensitivity: parseInt(value) });
-    sendSettingsToContent();
-  });
-
-  sampleRateSlider.addEventListener('input', (e) => {
-    const value = e.target.value;
-    sampleRateValue.textContent = value;
-    chrome.storage.sync.set({ sampleRate: parseInt(value) });
     sendSettingsToContent();
   });
 
@@ -58,6 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
     sendSettingsToContent();
   });
 
+  protectionEnabledToggle.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    chrome.storage.sync.set({ protectionEnabled: enabled });
+    updateStatus(enabled);
+    sendToggleToContent(enabled);
+  });
+
   resetBtn.addEventListener('click', () => {
     chrome.storage.sync.set({ flashesDetected: 0, videosProtected: 0 });
     flashesDetectedEl.textContent = '0';
@@ -65,7 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ action: 'resetStats' });
   });
 
-  // Send settings to content script
+  function updateStatus(enabled) {
+    if (enabled) {
+      statusDot.classList.add('active');
+      statusText.textContent = 'Protection Active';
+    } else {
+      statusDot.classList.remove('active');
+      statusText.textContent = 'Protection Disabled';
+    }
+  }
+
   function sendSettingsToContent() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
@@ -73,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
           action: 'updateSettings',
           settings: {
             sensitivity: parseInt(sensitivitySlider.value),
-            sampleRate: parseInt(sampleRateSlider.value),
             normalHoldFrames: parseInt(normalHoldFramesSlider.value),
             showNotification: showNotificationToggle.checked
           }
@@ -82,7 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Check if on YouTube and get stats
+  function sendToggleToContent(enabled) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'toggleProtection',
+          enabled: enabled
+        });
+      }
+    });
+  }
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0] && tabs[0].url && tabs[0].url.includes('youtube.com')) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getStats' }, (response) => {
@@ -97,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Listen for stats updates from content script
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'statsUpdate') {
       flashesDetectedEl.textContent = message.flashesDetected;

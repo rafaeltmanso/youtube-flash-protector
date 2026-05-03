@@ -20,16 +20,24 @@
 
     <main>
       <div class="status" id="status">
-        <span class="status-dot active"></span>
-        <span class="status-text">Protection Active</span>
+        <span class="status-dot active" id="statusDot"></span>
+        <span class="status-text" id="statusText">Protection Active</span>
+      </div>
+
+      <div class="toggle-group">
+        <label class="toggle">
+          <input type="checkbox" id="protectionEnabled" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Enable protection</span>
       </div>
 
       <div class="controls">
         <div class="control-group">
           <label for="sensitivity">Brightness Threshold</label>
           <div class="slider-container">
-            <input type="range" id="sensitivity" min="150" max="255" value="200">
-            <span class="slider-value" id="sensitivityValue">200</span>
+            <input type="range" id="sensitivity" min="100" max="255" value="170">
+            <span class="slider-value" id="sensitivityValue">170</span>
           </div>
           <span class="hint">Lower = more sensitive</span>
         </div>
